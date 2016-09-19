@@ -15,7 +15,7 @@ const Promise = require('promise');
 const yeoman = require('yeoman-environment');
 const semver = require('semver');
 
-function upgrade(args, config) {
+function generate(args, config) {
   args = args || process.argv;
   const env = yeoman.createEnv();
   const pak = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -99,8 +99,8 @@ function upgrade(args, config) {
 }
 
 module.exports = {
-  name: 'upgrade',
+  name: 'generate',
   description: 'upgrade your app\'s template files to the latest version; run this after ' +
     'updating the react-native version in your package.json and running npm install',
-  func: upgrade,
+  func: generate,
 };
