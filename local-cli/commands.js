@@ -47,6 +47,7 @@ const documentedCommands = [
   require('./install/install'),
   require('./install/uninstall'),
   require('./upgrade/generate'),
+  require('./upgrade/upgrade'),
   require('./logAndroid/logAndroid'),
   require('./logIOS/logIOS'),
   require('./dependencies/dependencies'),
