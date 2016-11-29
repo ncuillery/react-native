@@ -70,6 +70,13 @@ function readPackageFiles() {
     'package.json'
   );
 
+  const reactPakPath = path.resolve(
+    process.cwd(),
+    'node_modules',
+    'react',
+    'package.json'
+  );
+
   const pakPath = path.resolve(
     process.cwd(),
     'package.json'
@@ -77,13 +84,14 @@ function readPackageFiles() {
 
   try {
     const rnPak = JSON.parse(fs.readFileSync(rnPakPath, 'utf8'));
+    const reactPak = JSON.parse(fs.readFileSync(reactPakPath, 'utf8'));
     const pak = JSON.parse(fs.readFileSync(pakPath, 'utf8'));
 
-    return {rnPak, pak};
+    return {rnPak, reactPak, pak};
   } catch (err) {
     throw new Error(
-      'Unable to find "' + pakPath + '" or "' + rnPakPath + '". Make sure that you have run ' +
-      '"npm install" and that you are inside a React Native project.'
+      'Unable to find one of "' + pakPath + '", "' + rnPakPath + '" or "' + reactPakPath + '".' +
+      ' Make sure that you have run "npm install" and that you are inside a React Native project.'
     )
   }
 }
@@ -190,11 +198,13 @@ async function run(requiredVersion, cliArgs) {
     await checkForUpdates();
 
     log.info('Read package.json files');
-    const {rnPak, pak} = readPackageFiles();
+    const {rnPak, reactPak, pak} = readPackageFiles();
     context.appName = pak.name;
     context.currentVersion = rnPak.version;
+    context.currentReactVersion = reactPak.version;
     context.declaredVersion = pak.dependencies['react-native'];
     context.declaredReactVersion = pak.dependencies.react;
+    context.newReactVersion = null;
 
     const verbose = context.cliArgs.verbose;
 
@@ -210,9 +220,17 @@ async function run(requiredVersion, cliArgs) {
     log.info('Check Git installation');
     checkGitAvailable();
 
-    log.info('Get react-native version from NPM registry');
-    const versionOutput = await exec('npm view react-native@' + (context.requiredVersion || 'latest') + ' version', verbose);
-    context.newVersion = semver.clean(versionOutput);
+    log.info('Get information from NPM registry');
+    const viewCommand = 'npm view react-native@' + (context.requiredVersion || 'latest') + ' peerDependencies.react version --json';
+    const viewOutput = await exec(viewCommand, verbose).then(JSON.parse);
+    context.newVersion = viewOutput.version;
+    context.newReactVersionRange = viewOutput['peerDependencies.react'];
+
+    if (!semver.satisfies(context.currentReactVersion, context.newReactVersionRange)) {
+      log.info('Retrieve latest react version satisfying ' + context.newReactVersionRange);
+      const compatReactVersions = await exec('npm view react@"' + context.newReactVersionRange + '" version --json').then(JSON.parse);
+      context.newReactVersion = semver.maxSatisfying(compatReactVersions, context.newReactVersionRange);
+    }
 
     log.info('Check new version');
     checkNewVersion(context.newVersion, context.requiredVersion);
@@ -246,7 +264,12 @@ async function run(requiredVersion, cliArgs) {
     await exec('git commit -m "Old version" --allow-empty', verbose);
 
     log.info('Install the new version');
-    await exec('npm install --save react-native@' + context.newVersion + ' --color=always', verbose);
+    let installCommand = 'npm install --save --color=always';
+    installCommand += ' react-native@' + context.newVersion;
+    if (context.newReactVersion) {
+      installCommand += ' react@' + context.newReactVersion;
+    }
+    await exec(installCommand, verbose);
 
     log.info('Generate new version template');
     await generateTemplates(context.generatorDir, context.appName, verbose);
