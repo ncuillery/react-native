@@ -36,11 +36,13 @@ log.heading = 'git-upgrade';
  * @returns {Promise}
  */
 function exec(command, logOutput) {
+  console.log('COMMAND', command);
   return new Promise((resolve, reject) => {
     let stderr, stdout = '';
     const child = shell.exec(command, {async: true, silent: true});
 
     child.stdout.on('data', data => {
+      console.log('DATA', data.length);
       stdout += data;
       if (logOutput) {
         process.stdout.write(data);
@@ -48,11 +50,13 @@ function exec(command, logOutput) {
     });
 
     child.stderr.on('data', data => {
+      console.log('ERROR', data.length);
       stderr += data;
       process.stderr.write(data);
     });
 
     child.on('exit', code => {
+      console.log('EXIT', code);
       (code === 0)
         ? resolve(stdout)
         : reject(new Error(`Command '${command}' exited with code ${code}:
